@@ -193,12 +193,12 @@
         <h2>SETUP</h2>
         <p><span class="step-num">1</span>เปิด <a href="https://sheets.google.com" target="_blank" class="setup-link">Google Sheets</a> แล้ว Import ไฟล์ Excel เข้าไป</p>
         <p><span class="step-num">2</span>กด <b>Share</b> (มุมขวาบน) > เปลี่ยนเป็น <b>"Anyone with the link" > Viewer</b></p>
-        <p><span class="step-num">3</span>Copy <b>Sheet ID</b> จาก URL:<br>
-        <code>https://docs.google.com/spreadsheets/d/<b style="color:var(--green)">SHEET_ID_HERE</b>/edit</code></p>
-        <p><span class="step-num">4</span>วาง Sheet ID ลงในช่องด้านล่าง:</p>
-        <input type="text" id="sheetIdInput" placeholder="วาง Google Sheet ID ตรงนี้..." autocomplete="off">
-        <p style="font-size:12px;color:var(--text-dim)">Sheet name (ชื่อ tab):</p>
-        <input type="text" id="sheetNameInput" value="WFA-Schedule" placeholder="WFA-Schedule">
+        <p><span class="step-num">3</span>Copy <b>Sheet ID</b> และ <b>gid</b> จาก URL:<br>
+        <code>https://docs.google.com/spreadsheets/d/<b style="color:var(--green)">SHEET_ID</b>/edit#gid=<b style="color:var(--orange)">GID</b></code></p>
+        <p><span class="step-num">4</span>วางลงในช่องด้านล่าง:</p>
+        <input type="text" id="sheetIdInput" placeholder="วาง Sheet ID ตรงนี้..." autocomplete="off">
+        <p style="font-size:12px;color:var(--text-dim)">gid (ตัวเลขหลัง #gid= จาก URL เมื่อคลิก tab WFA-Schedule):</p>
+        <input type="text" id="sheetGidInput" value="" placeholder="เช่น 1234567890">
         <button onclick="saveSetup()">CONNECT</button>
         <div class="setup-err" id="setupErr"></div>
     </div>
@@ -262,7 +262,7 @@ let wfa = null, refreshTimer = null, currentDate = new Date();
 function getConfig() {
     return {
         sheetId: localStorage.getItem('vo_sheetId') || '',
-        sheetName: localStorage.getItem('vo_sheetName') || 'WFA-Schedule'
+        sheetGid: localStorage.getItem('vo_sheetGid') || ''
     };
 }
 
@@ -271,10 +271,11 @@ function hideSetup() { document.getElementById('setupOverlay').style.display = '
 
 function saveSetup() {
     const id = document.getElementById('sheetIdInput').value.trim();
-    const name = document.getElementById('sheetNameInput').value.trim() || 'WFA-Schedule';
+    const gid = document.getElementById('sheetGidInput').value.trim();
     if (!id) { document.getElementById('setupErr').textContent = 'Please enter a Sheet ID'; return; }
+    if (!gid) { document.getElementById('setupErr').textContent = 'Please enter gid (click WFA-Schedule tab, then copy number after #gid= in URL)'; return; }
     localStorage.setItem('vo_sheetId', id);
-    localStorage.setItem('vo_sheetName', name);
+    localStorage.setItem('vo_sheetGid', gid);
     hideSetup();
     fetchData();
 }
@@ -308,14 +309,22 @@ function parseCSV(text) {
 
 function parseDate(val) {
     if (!val) return null;
-    // Try various date formats
     const v = val.trim();
-    // ISO: 2025-01-06, or with time
+    // ISO: 2025-01-06
     let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-    // US: 1/6/2025 or 01/06/2025
+    // DD/MM/YYYY (Google Sheets Thai/EU format) or D/M/YYYY
     m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+    if (m) {
+        const a = parseInt(m[1]), b = parseInt(m[2]), y = parseInt(m[3]);
+        // If first number > 12, it must be day (DD/MM/YYYY)
+        // If second number > 12, it must be month (MM/DD/YYYY)
+        // Default: assume DD/MM/YYYY (Thai locale)
+        if (a > 12) return `${y}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`;
+        if (b > 12) return `${y}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`;
+        // Ambiguous — assume DD/MM/YYYY
+        return `${y}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`;
+    }
     // Google Sheets serial number
     if (/^\d{5}$/.test(v)) {
         const d = new Date((parseInt(v) - 25569) * 86400000);
@@ -384,7 +393,7 @@ async function fetchData() {
 
     setLive('load', 'Loading...');
     try {
-        const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(cfg.sheetName)}`;
+        const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/export?format=csv&gid=${cfg.sheetGid}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Google Sheets error: ${res.status}. Check Sheet ID and sharing settings.`);
         const csv = await res.text();
