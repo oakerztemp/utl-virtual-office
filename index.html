@@ -259,10 +259,13 @@ const SHIRT = ['#4a90d9','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67
 let wfa = null, refreshTimer = null, currentDate = new Date();
 
 // ===== SETUP / STORAGE =====
+const DEFAULT_SHEET_ID = '19KVaZOs3rYPo_zOxvbQehBqG63qw8UJF';
+const DEFAULT_GID = '1423244185';
+
 function getConfig() {
     return {
-        sheetId: localStorage.getItem('vo_sheetId') || '',
-        sheetGid: localStorage.getItem('vo_sheetGid') || ''
+        sheetId: localStorage.getItem('vo_sheetId') || DEFAULT_SHEET_ID,
+        sheetGid: localStorage.getItem('vo_sheetGid') || DEFAULT_GID
     };
 }
 
@@ -475,7 +478,7 @@ document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')changeDate(-1);if
 
 // INIT
 const cfg = getConfig();
-if (!cfg.sheetId) { showSetup(); }
+if (!cfg.sheetId && !DEFAULT_SHEET_ID) { showSetup(); }
 else { fetchData(); setRefresh(300); }
 </script>
 
